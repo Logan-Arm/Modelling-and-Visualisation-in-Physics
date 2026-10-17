@@ -1,0 +1,168 @@
+Checkpoint 3 Modelling and Visualisation
+
+A Python simulation framework for two PDE physics models: **Cahn-Hilliard** (which can be used for phase separation models) and **Poisson** (electromagnetism models). Numba is used throughout for JIT-compiled, parallelised performance as traditional methods with numpy were found to be very slow.
+
+---
+
+## Features
+
+- Cahn-Hilliard phase-field simulation in dimensionless units
+- Poisson solver for electrostatics (3D) and magnetostatics (2D)
+- Multiple iterative solvers: Jacobi, Gauss-Seidel, and SOR (Successive Over-Relaxation)
+- Live animations via Matplotlib and imshow
+- Data collection utilities with CSV export
+- Numba-accelerated inner loops with parallel row iteration
+
+---
+
+## Requirements
+
+```
+numpy
+matplotlib
+numba
+seaborn
+csv
+argparse
+```
+
+## Usage
+
+Run from the command line. All the input parameters have defined default values, so very little is necessary from user side to achieve results
+
+### Cahn-Hilliard animation
+
+```bash
+python simulation.py --LatticeType Cahn_Hilliard --Length 100 --Width 100 --dx 1.0 --dt 0.01 --Phi0 0.0
+```
+#Note^ These are all the default values so simply running the file would result in this
+
+### Poisson solver (electrostatics)
+
+```bash
+python simulation.py --LatticeType Poisson --Seed 1 --Length 100 --Width 100 --Height 100
+```
+
+---
+
+## Command-line Arguments
+
+| Argument | Type | Default | Description |
+|---|---|---|---|
+| `--LatticeType` | str | `Cahn_Hilliard` | `Cahn_Hilliard` or `Poisson` |
+| `--Length` | int | 100 | Lattice length |
+| `--Width` | int | 100 | Lattice width |
+| `--Height` | int | 100 | Lattice height (Poisson 3D only) |
+| `--Phi0` | float | 0.0 | Initial mean composition (Cahn-Hilliard) |
+| `--dx` | float | 1.0 | Spatial step (units of xi = sqrt(k/a)) |
+| `--dt` | float | 0.01 | Time step (units of tau = k/(Ma^2)) |
+| `--Perm` | float | 1.0 | Permittivity (Poisson only) |
+| `--Seed` | int | 0 | Poisson charge configuration (see below) |
+| `--FracCharge` | float | 0.2 | Fraction of sites with charge (Seed 2) |
+| `--w` | float | 1.9 | SOR relaxation parameter w (omega) |
+| `--Threshhold` | float | 1e-6 | Convergence threshold |
+| `--ConvergenceCriteria` | int | 10 | Consecutive steps below threshold to declare convergence |
+| `--Trial` | bool | False | Run a data collection trial |
+| `--TrialSeed` | int | 0 | Which trial to run (see below) |
+| `--StartVal` | float | 0.0 | Start value for trial sweeps |
+| `--EndVal` | float | 1.0 | End value for trial sweeps |
+| `--Resolution` | int | 10 | Number of steps in trial sweep |
+| `--Filename` | str | `MVP_checkpoint_3.csv` | Output CSV filename |
+
+---
+
+## Poisson Seed Physical Setups
+
+| Seed | Description |
+|---|---|
+| 0 | Single charge at a random interior location (3D) |
+| 1 | Single charge at the centre of the box (3D) |
+| 2 | Random charge distribution at fraction `FracCharge` (3D) |
+| 3 | Infinite wire along the z-axis through the centre (3D) |
+| 4 | Wire through centre — 2D magnetic case |
+
+^Note - The boundaries of all lattices are initialized such that they are always zero. This is done to represent infinite boundaries, but the result is that for the seed 0, or seed 2 no charges are ever initialized in the boundaries
+
+---
+
+## Data Collection Trials (`--Trial True`)
+
+| `--TrialSeed` | Description |
+|---|---|
+| 0 | SOR w sweep — measures iterations to convergence across a range of w values |
+| 1 | Cahn-Hilliard free energy vs time |
+| 2 | Electric potential and field strength vs distance from a monopole, and midplane cuts |
+| 3 | Magnetic potential and field strength vs distance from an infinite wire, and printout of lattice potential and magnitude |
+
+^Note, for seed 1, use `--dt 1e-4` for smooth curves, as a dt of 0.01 results in a plateau, which while physically still correct, is less visually appealing
+
+All trials save results to `<Filename>.csv`.
+
+---
+
+## Classes
+
+### `Cahn_Hilliard`
+
+Simulates spinodal decomposition using the Cahn-Hilliard equation in dimensionless form:
+
+```
+dphi/dt = (grad)^2 mu,    mu = -phi +phi^3 -(grad)^2 phi 
+```
+
+All physical constants (a, b, k, M) are absorbed into the length and time units, so no explicit material parameters are required.
+
+Key methods:
+
+- `animate_fig()` — returns a live Matplotlib animation
+- `free_energy_data(...)` — plots free energy vs time and saves data
+- `free_energy_lattice()` — computes the current total free energy
+
+### `Poisson`
+Both use dirichlet boundary conditions
+
+Solves (grad)^2 phi = -rho/epsilon for electric cases, uses 3D lattice
+Solves (grad)^2 A = -mu_0 J for magnetic cases, uses 2D lattice
+
+
+Available solvers:
+
+- `update_pot_Jacobi()` — Jacobi upgrade algorithm for 3D lattices
+- `Gauss_Seidel_3d()` / `Gauss_Seidel_2d()` — Gauss-Seidel iteration (for 3d and 2d respectively0)
+- `GS_SOR_3d()` / `GS_SOR_2d()` — SOR iteration (recommended for fastest convergence, for all but SORw trials an omega value of 1.9 is acceptable)
+
+Analysis methods:
+
+- `E_field()` — computes electric field components and magnitude
+- `mag_field_calc()` — computes magnetic field from vector potential
+- `electric_vs_center()` — plots potential and E-field vs distance on a log-log scale
+- `mag_vs_center()` — plots magnetic potential and B-field vs distance
+- `midplane_cut_pot()` / `midplane_cut_Efield()` — midplane slice visualisations
+
+^Note: for magnetic pot vs dist distance is graphed logarithmecally, for Bfield vs dist both are graphed logarithmecally 
+
+### `DataCollection`
+
+Controls parameter sweeps and saves results to CSV. Initialise with grid dimensions, step sizes, and trial bounds, then calls the appropriate trial method.
+
+---
+
+## Dimensionless Units
+
+The Cahn-Hilliard model is written entirely in dimensionless form. To recover physical quantities:
+
+| Dimensionless | Physical |
+|---|---|
+| Length `dx` | In units of xi = sqrt(k/a) |
+| Time `dt` | In units of tau = k/(Ma^2) |
+| Phi | Order parameter (composition) |
+| Free energy density | In units of a^2/k |
+
+---
+
+## Notes
+
+- Numba compiles on first call; a `warmup()` step runs automatically at initialisation on a small dummy lattice to avoid delays during actual runs
+- Periodic boundary conditions are used for Cahn-Hilliard; Dirichlet (zero) boundaries are used for Poisson.
+- The SOR solver with w ~ 1.9 is substantially faster than Jacobi for the Poisson problem. Use the TrialSeed 0 trial to find the optimal w value for any grid not 100x100x100
+- For smooth free energy curves in Cahn-Hilliard trials, use `--dt 1e-4`, for more information look in TrialSeed note
