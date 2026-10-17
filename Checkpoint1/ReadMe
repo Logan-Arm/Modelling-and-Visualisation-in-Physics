@@ -1,0 +1,130 @@
+# Ising Model Monte Carlo Simulation
+
+## Overview
+
+This code implements a 2D Ising model simulation using Monte Carlo methods with two different dynamics: Glauber (single spin-flip) and Kawasaki (spin-exchange). The simulation performs temperature sweeps to extract thermodynamic quantities including magnetization, energy, magnetic susceptibility, and heat capacity.
+
+## Physical Model
+
+The 2D Ising model describes a lattice of spins that can take values of +-1, interacting via nearest-neighbor coupling. The total energy is described by -J * all spin neighbor pair products(i.e. sum over ij of si*sj)
+
+where J is the coupling constant (set to 1.0), and the sum runs over nearest-neighbor pairs. Periodic boundary conditions are implemented to minimize finite-size effects.
+
+## Dynamics
+
+### Glauber Dynamics
+Single spin-flip dynamics that does not conserve magnetization. At each step:
+- A random spin is selected
+- Energy change deltaE is calculated for flipping that spin
+- The flip is accepted with probability min(1, exp(-deltaE/kT))
+
+### Kawasaki Dynamics
+Spin-exchange dynamics that conserves total magnetization. At each step:
+- Two random spins are selected
+- Energy change deltaE is calculated for swapping them
+- The swap is accepted with probability min(1, exp(-deltaE/kT))
+
+## Thermodynamic Observables
+
+The code calculates the following quantities as functions of temperature:
+
+**Magnetization**: M = sum of all spin values
+
+**Energy**: See physics model seection for explanation of energy calculation
+
+**Magnetic Susceptibility**: X = (⟨M^2⟩ - ⟨M⟩^2) / (NkT)
+
+**Heat Capacity**: C_v = (⟨E^2⟩ - ⟨E⟩^2) / (NkT^2)
+
+where N is the total number of spins, k is Boltzmann's constant, and T is temperature.
+
+## Simulation Protocol
+
+1. Initialize lattice at high temperature (default T = 3.0) with random spin configuration
+2. For each temperature:
+   - Equilibrate the system for a specified number of sweeps
+   - Collect measurements every 10 sweeps
+   - Calculate ensemble averages and uncertainties
+3. Decrease temperature in steps of deltaT = 0.1
+4. Continue until T ~ 1.0 (approximately due to floating point imprecision)
+
+One "sweep" consists of N Monte Carlo steps, where N is the lattice size.
+
+## Usage
+
+### Command Line Arguments
+
+```bash
+python ising_simulation.py [options]
+```
+
+**Options**:
+- `--length`: Lattice height (default: 50)
+- `--width`: Lattice width (default: 50)
+- `--J`: Coupling constant (default: 1)
+- `--k`: Boltzmann constant (default: 1)
+- `--T`: Starting temperature (default: 3.0)
+- `--Dynamics`: 0 for Glauber, 1 for Kawasaki (default: 0)
+- `--SweepsPerTemp`: Measurement sweeps per temperature (default: 10000)
+- `--EquibSweep`: Equilibration sweeps (default: 1000)
+- `--TotalSweeps`: Total sweeps for simulation (default: 220000)
+- `--Animate`: 0 for no animation, 1 to visualize (default: 0)
+
+### Example
+
+```bash
+# Run Glauber dynamics on 50×50 lattice
+python ising_simulation.py --Dynamics 0 --SweepsPerTemp 10000
+
+# Run Kawasaki dynamics with animation
+python ising_simulation.py --Dynamics 1 --Animate 1
+```
+
+## Output
+
+### Plots
+The code generates four plots:
+1. Magnetic susceptibility vs temperature (error bar structure is present but commented out)
+2. Heat capacity vs temperature (with error bars)
+3. Average energy vs temperature
+4. Average absolute magnetization vs temperature
+
+### Data File
+Results are saved to `ising_data.txt` with columns:
+- Temperature
+- Magnetic susceptibility
+- Heat capacity
+- Heat capacity uncertainty
+- Average energy
+- Average absolute magnetization
+
+## Error Analysis
+
+Uncertainties are estimated using bootstrap resampling. For each temperature point, the collected measurements are resampled with replacement, and the observable is recalculated. The standard deviation of the resampled values provides the uncertainty estimate.
+
+## Physical Interpretation
+
+For the 2D Ising model with Glauber dynamics:
+- The critical temperature is T_c ~ 2.269 (in units where J/k = 1)
+- Below T_c: ordered phase with spontaneous magnetization
+- Above T_c: disordered paramagnetic phase
+- Susceptibility and heat capacity show peaks near T_c
+
+For Kawasaki dynamics, the behavior differs due to conserved magnetization, and the system may exhibit phase separation rather than a standard phase transition.
+
+## Implementation Notes
+
+- Energy is tracked incrementally to improve efficiency, avoiding full lattice recalculation at each step
+- Additionally, all deltaE's are added directly to the lattice energy value as opposed to recalculation for efficiency 
+- Checkerboard pattern prevents double-counting when calculating total energy
+- Periodic boundary conditions eliminate edge effects
+- The code uses nearest-neighbor energy differences for efficiency in accept/reject decisions
+
+## Dependencies
+
+- numpy
+- matplotlib
+- random
+- math
+- statistics
+- argparse
